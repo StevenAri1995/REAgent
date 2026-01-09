@@ -1,143 +1,142 @@
-export const WORKFLOW_CONFIG = {
-    1: {
-        role: 'State_RE_LT',
-        name: 'Lead Creation',
+export const WORKFLOW_STAGES = {
+    'Option_Identified': {
+        id: 1,
+        label: 'Option Identified',
+        role: 'State_RE',
+        subStatuses: ['Option Identified'],
         checklist: [
-            'Enter property address and title',
-            'Upload initial site photos',
-            'Provide basic site measurements',
+            'Identify potential site',
+            'Enter basic details'
         ],
-        fields: [
-            { name: 'address', label: 'Property Address', type: 'text', required: true },
-            { name: 'city', label: 'City', type: 'text', required: true },
-            { name: 'area_sqft', label: 'Carpet Area (sqft)', type: 'number', required: true },
-            { name: 'asking_rent', label: 'Asking Rent', type: 'number', required: true },
+        nextTransitions: [
+            { label: 'Submit for Validation', targetStage: 'Under_BT_Validation', targetSubStatus: 'Under BT Validation' }
         ]
     },
-    2: {
+    'Under_BT_Validation': {
+        id: 2,
+        label: 'Under BT Validation',
         role: 'BT',
-        name: 'Validation (BT)',
+        subStatuses: ['Under BT Validation', 'LT to revert on BT query'],
         checklist: [
-            'Verify location suitability',
-            'Review format specifications',
-            'Check competition proximity',
+            'Validate Catchment',
+            'Check Cannibalization'
         ],
-        fields: [
-            { name: 'feasibility', label: 'Feasibility Study Result', type: 'select', options: ['Yes', 'No'], required: true },
-            { name: 'sales_projection', label: 'Annual Sales Projection', type: 'number', required: true },
-            { name: 'format_suitability', label: 'Format Suitability', type: 'text', required: true },
+        nextTransitions: [
+            { label: 'Approve & Move to Negotiation', targetStage: 'Under_Negotiation', targetSubStatus: 'Under Negotiation' },
+            { label: 'Raise Query to State RE', targetStage: 'Under_BT_Validation', targetSubStatus: 'LT to revert on BT query', actionRole: 'State_RE' }, // Special case: State RE acts on this sub-status
+            { label: 'Reject / Drop', targetStage: 'Watchlist', targetSubStatus: 'To be dropped' }
         ]
     },
-    3: {
-        role: 'EPC',
-        name: 'Due Diligence (SDR)',
+    'Under_Negotiation': {
+        id: 3,
+        label: 'Under Negotiation',
+        role: 'State_RE',
+        subStatuses: ['Under Negotiation', 'Under Rate Validation', 'SDR Pending', 'Delayed as BTS / Under Construction'],
         checklist: [
-            'Conduct Site Due Diligence Report (SDR)',
-            'Check power availability',
-            'Inspect structural integrity',
+            'Negotiate Rentals',
+            'Confirm CAPEX scope'
         ],
-        fields: [
-            { name: 'sdr_report_link', label: 'SDR Report Link/Reference', type: 'text', required: true },
-            { name: 'power_load', label: 'Maximum Power Load (kW)', type: 'number', required: true },
-            { name: 'structural_status', label: 'Structural Status', type: 'text', required: true },
+        nextTransitions: [
+            { label: 'Submit for Rate Validation', targetStage: 'Under_Negotiation', targetSubStatus: 'Under Rate Validation', actionRole: 'BT' },
+            { label: 'Submit for BT Approval', targetStage: 'Under_BT_Approvals', targetSubStatus: 'Business feasibility pending' }
         ]
     },
-    4: {
-        role: 'RE_NHQ',
-        name: 'NHQ Commercial Validation',
+    'Under_BT_Approvals': {
+        id: 4,
+        label: 'Under BT Approvals',
+        role: 'BT',
+        subStatuses: ['Business feasibility pending', 'Layout approval Pending', 'Under SCO approval', 'Under SOW approval'],
         checklist: [
-            'Check viability vs benchmarks',
-            'Validate rent data for catchment',
+            'Finalize Sales Projection',
+            'Approve Layout',
+            'Freeze Scope of Work'
         ],
-        fields: [
-            { name: 'is_viable', label: 'Commercial Viability', type: 'select', options: ['Yes', 'No'], required: true },
-            { name: 'nhq_remarks', label: 'NHQ Remarks', type: 'text', required: true },
+        nextTransitions: [
+            { label: 'Approve & Move to Termsheet', targetStage: 'Termsheet_Approval_Process', targetSubStatus: 'Under NHQ RE / Finance Approval' }
         ]
     },
-    5: {
-        role: 'State_RE_LT',
-        name: 'Renegotiation',
+    'Termsheet_Approval_Process': {
+        id: 5,
+        label: 'Termsheet Approval',
+        role: 'RE_NHQ', // Primary, but involves multiple
+        subStatuses: ['Under NHQ RE / Finance Approval', 'Termsheet under BT approval', 'Termsheet under LT signoff', 'Under Apex Approval'],
         checklist: [
-            'Renegotiate based on NHQ feedback',
-            'Prepare final term sheet',
+            'Validate Commercial Terms',
+            'Ensure Budget Adherence'
         ],
-        fields: [
-            { name: 'final_rent', label: 'Final Negotiated Rent', type: 'number', required: true },
-            { name: 'term_sheet_link', label: 'Term Sheet Link', type: 'text', required: true },
+        nextTransitions: [
+            { label: 'Approve & Move to Acquisition', targetStage: 'Under_Acquisition', targetSubStatus: 'Under Legal Due Diligence' }
         ]
     },
-    6: {
-        role: 'RE_NHQ',
-        name: 'NHQ Final Approval',
-        checklist: [
-            'Verify renegotiated terms',
-            'Check for CAM concerns',
-        ],
-        fields: [
-            { name: 'final_nhq_approval', label: 'Final NHQ Approval', type: 'select', options: ['Approved', 'Rejected'], required: true },
-            { name: 'cam_remarks', label: 'CAM/Operational Remarks', type: 'text' },
-        ]
-    },
-    7: {
-        role: 'APEX',
-        name: 'Financial Approval (APEX)',
-        checklist: [
-            'Review CAPEX and P&L projections',
-            'Final financial sign-off',
-        ],
-        fields: [
-            { name: 'capex_amount', label: 'Total CAPEX', type: 'number', required: true },
-            { name: 'p_and_l_link', label: '5-Year P&L Projection Link', type: 'text', required: true },
-            { name: 'apex_status', label: 'Apex Decision', type: 'select', options: ['Approved', 'Rejected'], required: true },
-        ]
-    },
-    8: {
-        role: 'RE_NHQ',
-        name: 'Site Code Release',
-        checklist: [
-            'Generate Site Code in ERP',
-            'Intimate all stakeholders',
-        ],
-        fields: [
-            { name: 'site_code', label: 'Generated Site Code', type: 'text', required: true },
-        ]
-    },
-    9: {
+    'Under_Acquisition': {
+        id: 6,
+        label: 'Under Acquisition',
         role: 'Legal',
-        name: 'Legal Due Diligence (LDD)',
+        subStatuses: ['Under Legal Due Diligence', 'Under LOI / Agreement', 'LOI / MOU signed', 'Under Owner SOW completion', 'ATL signed', 'Agreement registered', 'RFC Offered'],
         checklist: [
-            'Verify title deeds',
-            'Draft LOI/MOU/ATL',
-            'Finalize lease agreement',
+            'Clear Title Check',
+            'Sign Agreements',
+            'Register Lease'
         ],
-        fields: [
-            { name: 'ldd_status', label: 'LDD Result', type: 'select', options: ['Clear', 'Issues Found'], required: true },
-            { name: 'agreement_type', label: 'Agreement Type Signed', type: 'text', required: true },
+        nextTransitions: [
+            { label: 'Handover to Projects (RFC)', targetStage: 'RFC_Process', targetSubStatus: 'RFC Done – Fitout to start' }
         ]
     },
-    10: {
-        role: 'NSO',
-        name: 'Fitment & Store Launch',
+    'RFC_Process': {
+        id: 7,
+        label: 'RFC / Fitout',
+        role: 'Projects', // Projects Team
+        subStatuses: ['RFC Done – Fitout to start', 'RFC Done – under Fitout', 'RFC Done – Fitout on hold'],
         checklist: [
-            'Coordinate merchandising',
-            'Oversee fit-out work',
-            'Plan launch events',
+            'Project Planning',
+            'Execution',
+            'Store Handover'
         ],
-        fields: [
-            { name: 'possession_date', label: 'Possession Date', type: 'date', required: true },
-            { name: 'launch_date', label: 'Store Launch Date', type: 'date', required: true },
+        nextTransitions: [
+            { label: 'Mark Operational', targetStage: 'Operational', targetSubStatus: 'Operational' }
         ]
     },
-    11: {
-        role: 'State_RE_LT',
-        name: 'Rent Declaration',
-        checklist: [
-            'Declare rent start after registration',
-            'Upload registration documents',
-        ],
-        fields: [
-            { name: 'rent_start_date', label: 'Rent Start Date', type: 'date', required: true },
-            { name: 'registration_link', label: 'Lease Registration Doc Link', type: 'text', required: true },
+    'Operational': {
+        id: 8,
+        label: 'Operational',
+        role: 'Central_SSO',
+        subStatuses: ['Operational'],
+        checklist: [],
+        nextTransitions: [
+            { label: 'Start Rent Declaration', targetStage: 'Rent_Declaration', targetSubStatus: 'RD by State RE' }
         ]
+    },
+    'Rent_Declaration': {
+        id: 9,
+        label: 'Rent Declaration',
+        role: 'Finance',
+        subStatuses: ['RD by State RE', 'RD approved by BT', 'RD submitted to Central SSO'],
+        checklist: [
+            'Start Rent Payment',
+            'Activate in ERP'
+        ],
+        nextTransitions: []
+    },
+    'Watchlist': {
+        id: 10,
+        label: 'Watchlist',
+        role: 'BT',
+        subStatuses: ['Hold by BT', 'Hold by RE', 'Long Lead', 'To be dropped'],
+        checklist: [],
+        nextTransitions: [] // Terminal or manual reactivation needed
     }
+};
+
+// Helper to determine who can edit based on stage/sub-status
+export const getActiveRole = (stage, subStatus) => {
+    // Special Exceptions
+    if (subStatus === 'LT to revert on BT query') return 'State_RE';
+    if (subStatus === 'Under Rate Validation') return 'BT';
+    if (subStatus === 'Termsheet under BT approval') return 'BT';
+    if (subStatus === 'Under Apex Approval') return 'APEX';
+    if (subStatus === 'RD by State RE') return 'State_RE';
+    if (subStatus === 'RD approved by BT') return 'BT';
+
+    // Default to Stage Owner
+    return WORKFLOW_STAGES[stage]?.role;
 };

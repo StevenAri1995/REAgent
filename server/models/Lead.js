@@ -11,10 +11,30 @@ const Lead = sequelize.define('Lead', {
         type: DataTypes.STRING,
         allowNull: false,
     },
-    status: {
-        type: DataTypes.ENUM('Draft', 'In_Progress', 'Approved', 'Rejected', 'Dropped'),
-        defaultValue: 'Draft',
+    stage: {
+        type: DataTypes.ENUM(
+            'Option_Identified',
+            'Under_BT_Validation',
+            'Under_Negotiation',
+            'Under_BT_Approvals',
+            'Termsheet_Approval_Process',
+            'Under_Acquisition',
+            'RFC_Process',
+            'Operational',
+            'Rent_Declaration',
+            'Watchlist'
+        ),
+        defaultValue: 'Option_Identified',
     },
+    sub_status: {
+        type: DataTypes.STRING,
+        defaultValue: 'Option Identified',
+    },
+    status: {
+        type: DataTypes.ENUM('Active', 'Hold', 'Dropped', 'Operational'),
+        defaultValue: 'Active',
+    },
+    // Keeping current_step temporarily for backward compat if needed, but defaulting to 1
     current_step: {
         type: DataTypes.INTEGER,
         defaultValue: 1,

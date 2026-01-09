@@ -25,13 +25,14 @@ const User = sequelize.define('User', {
     },
     role: {
         type: DataTypes.ENUM(
-            'State_RE_LT',
+            'State_RE',
             'BT',
-            'EPC',
             'RE_NHQ',
-            'APEX',
+            'Finance',
             'Legal',
-            'NSO',
+            'Projects',
+            'Central_SSO',
+            'APEX',
             'Admin'
         ),
         allowNull: false,

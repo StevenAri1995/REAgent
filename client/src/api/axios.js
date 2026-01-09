@@ -120,6 +120,13 @@ api.interceptors.request.use(async (config) => {
         return Promise.reject({ mockResponse: { data: { message: 'Success', lead } } });
     }
 
+    // Handle Delete Lead
+    if (config.url.startsWith('/leads/') && config.method === 'delete') {
+        const id = config.url.split('/')[2];
+        mockData.deleteMockLead(id);
+        return Promise.reject({ mockResponse: { data: { message: 'Lead deleted successfully' } } });
+    }
+
     return config;
 }, (error) => Promise.reject(error));
 

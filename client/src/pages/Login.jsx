@@ -74,9 +74,14 @@ const Login = () => {
 
                 {/* Helper for demo */}
                 <Box sx={{ mt: 2, p: 2, bgcolor: '#f0f0f0', borderRadius: 1, fontSize: '0.8rem', width: '100%' }}>
-                    <Typography variant="caption" display="block">Demo Credentials:</Typography>
-                    <div>State RE: state_re@leasetrack.com / password123</div>
-                    <div>Admin: admin@leasetrack.com / password123</div>
+                    <Typography variant="caption" display="block" sx={{ fontWeight: 'bold', mb: 1 }}>Demo Credentials (password: password123):</Typography>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                        <div><strong>State RE:</strong> state_re@leasetrack.com</div>
+                        <div><strong>Business Team:</strong> bt@leasetrack.com</div>
+                        <div><strong>EPC:</strong> epc@leasetrack.com</div>
+                        <div><strong>Apex:</strong> apex@leasetrack.com</div>
+                        <div><strong>Legal:</strong> legal@leasetrack.com</div>
+                    </Box>
                 </Box>
             </Box>
         </Container>

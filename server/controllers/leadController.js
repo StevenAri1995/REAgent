@@ -1,33 +1,23 @@
 const { Lead, LeadData, User } = require('../models');
-const WORKFLOW_STEPS = require('../config/workflowConfig');
+const { WORKFLOW_STAGES, getActiveRole } = require('../config/workflowConfig');
 
 const createLead = async (req, res) => {
     try {
-        if (req.user.role !== 'State_RE_LT' && req.user.role !== 'Admin') {
-            return res.status(403).json({ error: 'Only State RE LT can create leads.' });
+        if (req.user.role !== 'State_RE' && req.user.role !== 'Admin') {
+            return res.status(403).json({ error: 'Only State RE can create leads.' });
         }
 
         const { title, details } = req.body;
 
         const lead = await Lead.create({
             title,
-            current_step: 1,
-            status: 'In_Progress',
+            stage: 'Option_Identified',
+            sub_status: 'Option Identified',
+            status: 'Active',
             created_by: req.user.id
         });
 
-        if (details) {
-            await LeadData.create({
-                lead_id: lead.id,
-                step_number: 1,
-                data: details,
-                status: 'Approved',
-                submitted_by: req.user.id
-            });
-            // Move to step 2 immediately after creation
-            lead.current_step = 2;
-            await lead.save();
-        }
+        // Add initial history/log if needed (omitted for brevity)
 
         res.status(201).json(lead);
     } catch (error) {
@@ -67,7 +57,7 @@ const getLeadById = async (req, res) => {
 
         // Attach workflow config for the frontend
         const response = lead.toJSON();
-        response.workflowConfig = WORKFLOW_STEPS;
+        response.workflowConfig = WORKFLOW_STAGES;
 
         res.json(response);
     } catch (error) {
@@ -78,69 +68,74 @@ const getLeadById = async (req, res) => {
 
 const submitStepData = async (req, res) => {
     try {
-        const { id, stepNumber } = req.params;
-        const { data, action, remarks } = req.body;
-        const step = parseInt(stepNumber);
+        const { id } = req.params;
+        const { data, targetStage, targetSubStatus, remarks } = req.body;
 
         const lead = await Lead.findByPk(id);
         if (!lead) return res.status(404).json({ error: 'Lead not found' });
 
-        if (lead.current_step !== step && req.user.role !== 'Admin') {
-            return res.status(400).json({ error: `Lead is currently at step ${lead.current_step}, not ${step}` });
+        // Security Check: Verify User Role against Active Role for current Stage/SubStatus
+        const activeRole = getActiveRole(lead.stage, lead.sub_status);
+
+        // Allow Admin bypass
+        if (req.user.role !== 'Admin' && req.user.role !== activeRole) {
+            return res.status(403).json({ error: `Unauthorized. Currently waiting for ${activeRole}.` });
         }
 
-        const stepConfig = WORKFLOW_STEPS[step];
-        if (!stepConfig) return res.status(400).json({ error: 'Invalid step' });
+        // Update Lead State based on frontend input
+        // Note: In production we should validate if this transition is allowed based on config
+        if (targetStage) lead.stage = targetStage;
+        if (targetSubStatus) lead.sub_status = targetSubStatus;
 
-        // Validate User Role
-        if (req.user.role !== stepConfig.role && req.user.role !== 'Admin') {
-            return res.status(403).json({ error: `This step requires role: ${stepConfig.role}` });
-        }
-
-        // Handle Rejection (Loop Back)
-        if (action === 'reject') {
-            // If rejected, go back to previous step
-            if (step > 1) {
-                lead.current_step = step - 1;
-                lead.status = 'In_Progress'; // Ensure it's not marked as Rejected overall if it's a loop
-            } else {
-                lead.status = 'Rejected'; // Hard rejection for step 1
-            }
-            await lead.save();
-
-            await LeadData.create({
-                lead_id: lead.id,
-                step_number: step,
-                data,
-                status: 'Rejected',
-                remarks,
-                submitted_by: req.user.id
-            });
-            return res.json({ message: 'Step rejected and returned to previous user', lead });
-        }
-
-        // Handle Completion/Approval
-        await LeadData.create({
-            lead_id: lead.id,
-            step_number: step,
-            data,
-            status: 'Approved',
-            remarks,
-            submitted_by: req.user.id
-        });
-
-        if (step < 11) {
-            lead.current_step = step + 1;
-            // Business Logic: Branching or Dropping
-            if (step === 2 && data.feasibility === 'No') {
-                lead.status = 'Dropped';
-            }
+        // Map Status (High Level)
+        if (targetStage === 'Watchlist') {
+            if (targetSubStatus === 'To be dropped') lead.status = 'Dropped';
+            else lead.status = 'Hold';
+        } else if (targetStage === 'Operational') {
+            lead.status = 'Operational';
         } else {
-            lead.status = 'Approved';
+            lead.status = 'Active';
         }
 
         await lead.save();
-        res.json({ message: 'Step submitted successfully', lead });
+
+        // Create Ledger Entry
+        await LeadData.create({
+            lead_id: lead.id,
+            step_number: 0, // Using 0 as we moved away from linear steps
+            data: { ...data, transitionTo: targetSubStatus, stage: targetStage },
+            status: 'Approved',
+            remarks: remarks || `Moved to ${targetSubStatus}`,
+            submitted_by: req.user.id
+        });
+
+        res.json({ message: 'Lead updated successfully', lead });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server error' });
+    }
+};
+
+const deleteLead = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const lead = await Lead.findByPk(id);
+
+        if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+        // Authorization Check
+        // Allow Admin, or the Creator (State RE) to delete
+        if (req.user.role !== 'Admin' && lead.created_by !== req.user.id) {
+            return res.status(403).json({ error: 'Not authorized to delete this lead' });
+        }
+
+        // Soft Delete: Mark as 'Dropped'
+        lead.status = 'Dropped';
+        lead.sub_status = 'Deleted by User';
+        await lead.save();
+
+        res.json({ message: 'Lead dropped successfully' });
 
     } catch (error) {
         console.error(error);
@@ -152,5 +147,6 @@ module.exports = {
     createLead,
     getLeads,
     getLeadById,
-    submitStepData
+    submitStepData,
+    deleteLead
 };
