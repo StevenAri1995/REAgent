@@ -8,6 +8,11 @@ export const WORKFLOW_STAGES = {
             'Identify potential site',
             'Enter basic details'
         ],
+        fields: [
+            { name: 'location_coordinates', label: 'Location Coordinates', type: 'text', required: true },
+            { name: 'carpet_area', label: 'Carpet Area (sqft)', type: 'number', required: true },
+            { name: 'photos', label: 'Site Photos', type: 'file', required: true }
+        ],
         nextTransitions: [
             { label: 'Submit for Validation', targetStage: 'Under_BT_Validation', targetSubStatus: 'Under BT Validation' }
         ]
@@ -20,6 +25,10 @@ export const WORKFLOW_STAGES = {
         checklist: [
             'Validate Catchment',
             'Check Cannibalization'
+        ],
+        fields: [
+            { name: 'sales_projection', label: 'Annual Sales Projection', type: 'number', required: true },
+            { name: 'catchment_score', label: 'Catchment Score (1-10)', type: 'number' }
         ],
         nextTransitions: [
             { label: 'Approve & Move to Negotiation', targetStage: 'Under_Negotiation', targetSubStatus: 'Under Negotiation' },
@@ -36,6 +45,10 @@ export const WORKFLOW_STAGES = {
             'Negotiate Rentals',
             'Confirm CAPEX scope'
         ],
+        fields: [
+            { name: 'negotiated_rent', label: 'Negotiated Rent', type: 'number', required: true },
+            { name: 'capex_ask', label: 'Landlord Capex Scope', type: 'text' }
+        ],
         nextTransitions: [
             { label: 'Submit for Rate Validation', targetStage: 'Under_Negotiation', targetSubStatus: 'Under Rate Validation', actionRole: 'BT' },
             { label: 'Submit for BT Approval', targetStage: 'Under_BT_Approvals', targetSubStatus: 'Business feasibility pending' }
@@ -51,6 +64,10 @@ export const WORKFLOW_STAGES = {
             'Approve Layout',
             'Freeze Scope of Work'
         ],
+        fields: [
+            { name: 'final_projection', label: 'Final Sales Projection', type: 'number', required: true },
+            { name: 'layout_plan', label: 'Layout Plan', type: 'file', required: true }
+        ],
         nextTransitions: [
             { label: 'Approve & Move to Termsheet', targetStage: 'Termsheet_Approval_Process', targetSubStatus: 'Under NHQ RE / Finance Approval' }
         ]
@@ -63,6 +80,10 @@ export const WORKFLOW_STAGES = {
         checklist: [
             'Validate Commercial Terms',
             'Ensure Budget Adherence'
+        ],
+        fields: [
+            { name: 'commercial_terms', label: 'Final Commercial Terms', type: 'text', required: true },
+            { name: 'standard_clause_deviation', label: 'Deviation from Standard Clauses', type: 'text' }
         ],
         nextTransitions: [
             { label: 'Approve & Move to Acquisition', targetStage: 'Under_Acquisition', targetSubStatus: 'Under Legal Due Diligence' }
@@ -78,6 +99,10 @@ export const WORKFLOW_STAGES = {
             'Sign Agreements',
             'Register Lease'
         ],
+        fields: [
+            { name: 'ldd_report', label: 'LDD Report', type: 'file', required: true },
+            { name: 'registration_date', label: 'Registration Date', type: 'date' }
+        ],
         nextTransitions: [
             { label: 'Handover to Projects (RFC)', targetStage: 'RFC_Process', targetSubStatus: 'RFC Done – Fitout to start' }
         ]
@@ -92,6 +117,9 @@ export const WORKFLOW_STAGES = {
             'Execution',
             'Store Handover'
         ],
+        fields: [
+            { name: 'handover_date', label: 'Store Handover Date', type: 'date', required: true }
+        ],
         nextTransitions: [
             { label: 'Mark Operational', targetStage: 'Operational', targetSubStatus: 'Operational' }
         ]
@@ -102,6 +130,9 @@ export const WORKFLOW_STAGES = {
         role: 'Central_SSO',
         subStatuses: ['Operational'],
         checklist: [],
+        fields: [
+            { name: 'go_live_date', label: 'Go Live Date', type: 'date', required: true }
+        ],
         nextTransitions: [
             { label: 'Start Rent Declaration', targetStage: 'Rent_Declaration', targetSubStatus: 'RD by State RE' }
         ]
@@ -115,6 +146,10 @@ export const WORKFLOW_STAGES = {
             'Start Rent Payment',
             'Activate in ERP'
         ],
+        fields: [
+            { name: 'payment_start_date', label: 'Rent Payment Start Date', type: 'date', required: true },
+            { name: 'vendor_code', label: 'SAP Vendor Code', type: 'text' }
+        ],
         nextTransitions: []
     },
     'Watchlist': {
@@ -123,6 +158,7 @@ export const WORKFLOW_STAGES = {
         role: 'BT',
         subStatuses: ['Hold by BT', 'Hold by RE', 'Long Lead', 'To be dropped'],
         checklist: [],
+        fields: [],
         nextTransitions: [] // Terminal or manual reactivation needed
     }
 };

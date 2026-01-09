@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import {
-    Container, Typography, Button, Box, Paper,
+    Container, Typography, Button, Box, Paper, Divider,
     CircularProgress, Alert, TextField, Checkbox, Chip
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +18,8 @@ const LeadDetail = () => {
     const [formData, setFormData] = useState({});
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         fetchLead();
@@ -37,22 +39,62 @@ const LeadDetail = () => {
     };
 
     const handleInputChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+        // Clear error when user types
+        if (errors[name]) {
+            setErrors({ ...errors, [name]: '' });
+        }
     };
 
     const handleTransition = async (transition) => {
         try {
+            // Client-side Validation
+            const currentStageConfig = WORKFLOW_STAGES[lead.stage] || {};
+            let newErrors = {};
+            let hasError = false;
+
+            if (currentStageConfig.fields) {
+                for (const field of currentStageConfig.fields) {
+                    const value = formData[field.name];
+
+                    // 1. Required Check
+                    if (field.required && !value) {
+                        newErrors[field.name] = `${field.label} is required.`;
+                        hasError = true;
+                    }
+
+                    // 2. Type Check
+                    if (value) {
+                        if (field.type === 'number') {
+                            if (isNaN(Number(value))) {
+                                newErrors[field.name] = `${field.label} must be a valid number.`;
+                                hasError = true;
+                            }
+                        }
+                        // Add more type checks as needed (e.g., date validation is usually handled by the input type="date" itself, but acts as a string)
+                    }
+                }
+            }
+
+            if (hasError) {
+                setErrors(newErrors);
+                return;
+            }
+
             setSubmitting(true);
-            await api.post(`/leads/${id}/step/0`, { // Step 0 as we use stage/sub-status now
+            await api.post(`/leads/${id}/step/0`, {
                 data: formData,
                 remarks: formData.remarks,
                 targetStage: transition.targetStage,
                 targetSubStatus: transition.targetSubStatus
             });
             setFormData({});
+            setErrors({}); // Clear errors on successful submission
             fetchLead();
         } catch (err) {
-            alert('Update failed');
+            console.error(err);
+            alert(err.response?.data?.error || 'Update failed');
         } finally {
             setSubmitting(false);
         }
@@ -118,6 +160,46 @@ const LeadDetail = () => {
                                 <Checkbox /> <Typography>{item}</Typography>
                             </Box>
                         ))}
+
+                        <Divider sx={{ my: 2 }} />
+                        <Typography variant="subtitle2" gutterBottom>Required Attributes</Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                            {currentStageConfig.fields && currentStageConfig.fields.map(field => {
+                                if (field.type === 'file') {
+                                    return (
+                                        <Box key={field.name} sx={{ border: '1px dashed #ccc', p: 2, borderRadius: 1 }}>
+                                            <Typography variant="caption" display="block">{field.label} {field.required && '*'}</Typography>
+                                            <Button variant="outlined" component="label" size="small" sx={{ mt: 1 }}>
+                                                Upload File
+                                                <input type="file" hidden onChange={(e) => {
+                                                    // Mock Upload Logic
+                                                    const fileName = e.target.files[0]?.name;
+                                                    setFormData({ ...formData, [field.name]: `s3://bucket/${fileName}` });
+                                                    alert(`Simulated Upload: ${fileName}`);
+                                                }} />
+                                            </Button>
+                                            {formData[field.name] && <Typography variant="caption" color="success.main" display="block">Attached: {formData[field.name]}</Typography>}
+                                        </Box>
+                                    );
+                                }
+                                return (
+                                    <TextField
+                                        key={field.name}
+                                        label={field.label}
+                                        type={field.type === 'date' ? 'date' : (field.type === 'number' ? 'number' : 'text')}
+                                        name={field.name}
+                                        value={formData[field.name] || ''}
+                                        onChange={handleInputChange}
+                                        required={field.required}
+                                        InputLabelProps={{ shrink: true }}
+                                        fullWidth
+                                        size="small"
+                                        error={!!errors[field.name]}
+                                        helperText={errors[field.name]}
+                                    />
+                                );
+                            })}
+                        </Box>
 
                         <TextField
                             fullWidth

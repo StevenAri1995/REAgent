@@ -1,13 +1,42 @@
 const { Lead, LeadData, User } = require('../models');
 const { WORKFLOW_STAGES, getActiveRole } = require('../config/workflowConfig');
 
+// Helper for Validation
+const validateFields = (fields, data) => {
+    if (!fields) return null;
+    for (const field of fields) {
+        const value = data ? data[field.name] : null;
+
+        // 1. Required Check
+        if (field.required && !value) {
+            return `Missing required field: ${field.label}`;
+        }
+
+        // 2. Type Check (Strict Server Side)
+        if (value) {
+            if (field.type === 'number' && isNaN(Number(value))) {
+                return `Invalid type for ${field.label}: Expected Number`;
+            }
+            // Add date validation if strictly needed, currently input/date ensures format
+        }
+    }
+    return null;
+};
+
 const createLead = async (req, res) => {
     try {
         if (req.user.role !== 'State_RE' && req.user.role !== 'Admin') {
             return res.status(403).json({ error: 'Only State RE can create leads.' });
         }
 
-        const { title, details } = req.body;
+        const { title, data } = req.body;
+        const initialStageConfig = WORKFLOW_STAGES['Option_Identified'];
+
+        // Strict Validation
+        const validationError = validateFields(initialStageConfig?.fields, data);
+        if (validationError) {
+            return res.status(400).json({ error: validationError });
+        }
 
         const lead = await Lead.create({
             title,
@@ -17,7 +46,15 @@ const createLead = async (req, res) => {
             created_by: req.user.id
         });
 
-        // Add initial history/log if needed (omitted for brevity)
+        // Create Initial Ledger Entry
+        await LeadData.create({
+            lead_id: lead.id,
+            step_number: 0,
+            data: data || {}, // Specific Stage 1 data
+            status: 'Approved',
+            remarks: 'Initial Submission',
+            submitted_by: req.user.id
+        });
 
         res.status(201).json(lead);
     } catch (error) {
@@ -82,6 +119,34 @@ const submitStepData = async (req, res) => {
             return res.status(403).json({ error: `Unauthorized. Currently waiting for ${activeRole}.` });
         }
 
+        const currentStageConfig = WORKFLOW_STAGES[lead.stage];
+
+        // 1. Strict Field Validation
+        const validationError = validateFields(currentStageConfig?.fields, data);
+        if (validationError) {
+            return res.status(400).json({ error: validationError });
+        }
+
+        // 2. Business Logic: Auto-Reject High Rent
+        // If stage is Negotiation and rent > 200 (mock), reject or warn.
+        if (lead.stage === 'Under_Negotiation' && data.negotiated_rent) {
+            if (Number(data.negotiated_rent) > 200) {
+                // Auto-Reject logic
+                // If the user tries to move to Rate Validation, we block it or force rejection.
+                // For now, let's just append a warning to the remarks, or effectively change the status if we wanted to be strict.
+                // Let's implement a soft warning in the remarks for now.
+                // Using a mutable variable for remarks requires it to be let-defined or modified in the create call
+                // Modifying the request body 'remarks' variable won't work if it's const, need to pass modified value
+            }
+        }
+
+        // Define final remarks to ensure System Warning is preserved if needed
+        let finalRemarks = remarks || `Moved to ${targetSubStatus}`;
+        if (lead.stage === 'Under_Negotiation' && Number(data.negotiated_rent) > 200) {
+            finalRemarks += " [SYSTEM WARNING: Rent exceeds 200 threshold]";
+        }
+
+
         // Update Lead State based on frontend input
         // Note: In production we should validate if this transition is allowed based on config
         if (targetStage) lead.stage = targetStage;
@@ -105,7 +170,7 @@ const submitStepData = async (req, res) => {
             step_number: 0, // Using 0 as we moved away from linear steps
             data: { ...data, transitionTo: targetSubStatus, stage: targetStage },
             status: 'Approved',
-            remarks: remarks || `Moved to ${targetSubStatus}`,
+            remarks: finalRemarks,
             submitted_by: req.user.id
         });
 

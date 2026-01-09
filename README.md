@@ -1,78 +1,155 @@
 # REAgent / LeadManager - Pan-India Real Estate Workflow
 
 ## Product Overview
-REAgent (LeadManager) is a role-based lead management system designed to streamline the "Pan-India New Store Opening" workflow. It facilitates a 10-stage process from "Option Identified" to "Rent Declaration," involving multiple stakeholders such as State RE, Business Team (BT), Finance, Legal, and Projects.
-
-### Key Features
--   **10-Stage Workflow**: Granular tracking with stages like 'Under Negotiation', 'Termsheet Approval', 'RFC / Fitout', etc.
--   **Role-Based Access Control (RBAC)**: Strict permissions for actions (e.g., only State RE can create leads, only BT can approve validation steps).
--   **Dynamic Dashboard**: Visual workflow progress bar, action item counters, and filtered views based on user role.
--   **Mock Mode**: Fully functional offline mode with simulated backend responses for testing and demos.
--   **Secure Deletion**: Soft-delete functionality restricted to Admins and the Lead Creator.
+REAgent (LeadManager) is a role-based lead management system designed to streamline the "Pan-India New Store Opening" workflow, facilitating a 10-stage process from "Option Identified" to "Rent Declaration".
 
 ---
 
-## Feature Walkthrough & Implementation Summary
+## 5. Workflow State Diagram & Role-Based Action Control
 
-### Completed Enhancements
-We have successfully implemented and refined the following core features:
+Below is the visual representation of the Lead Lifecycle, illustrating the flow between stages, sub-statuses, and the responsible roles.
 
-1.  **Workflow Dashboard**
-    -   Visualize the 10-stage progression.
-    -   Actionable "My Items" counter.
-    -   New columns: 'Stage' and 'Sub-Status'.
-    -   **Code Reference**: `client/src/pages/Dashboard.jsx`
+```mermaid
+stateDiagram-v2
+    [*] --> Option_Identified: Create Lead (State_RE)
+    
+    state Option_Identified {
+        [*] --> OptionIdentified
+        OptionIdentified --> Under_BT_Validation: Submit for Validation
+    }
 
-2.  **Lead Deletion Architecture**
-    -   **UI**: Material-UI confirmation dialog replacing native alerts.
-    -   **Backend**: `deleteLead` endpoint performing soft deletes (status -> 'Dropped').
-    -   **Mock Mode**: simulated `DELETE` requests in `axios.js`.
-    -   **Security**: Role checks to ensure only authorized users can delete.
+    state Under_BT_Validation {
+        [*] --> UnderBTValidation
+        UnderBTValidation --> Under_Negotiation: Approve (BT)
+        UnderBTValidation --> LT_to_revert: Raise Query (BT)
+        LT_to_revert --> UnderBTValidation: Submit Response (State_RE)
+        UnderBTValidation --> Watchlist: Reject/Drop (BT)
+    }
 
-3.  **Role & Security Hardening**
-    -   **Server**: `leadController.js` now validates if the requesting user has the authority to advance the workflow stage using `getActiveRole` from config.
-    -   **Config Synchronization**: Server and Client share the exact same 10-stage `workflowConfig.js`.
+    state Under_Negotiation {
+        [*] --> UnderNegotiation
+        UnderNegotiation --> UnderRateValidation: Submit for Rate Validation (State_RE)
+        UnderRateValidation --> UnderNegotiation: Validate & Return (BT)
+        UnderNegotiation --> Under_BT_Approvals: Submit for BT Approval (State_RE)
+    }
 
-### Validation
--   **Automated Verification**: We verified the delete flow, dialog appearance, and mock mode handling via browser automation.
--   **Manual Checks**: Confirmed role-gating on UI elements (btns disabled/hidden for incorrect roles).
+    state Under_BT_Approvals {
+        [*] --> BusinessFeasibilityPending
+        BusinessFeasibilityPending --> Termsheet_Approval_Process: Approve & Move (BT)
+    }
+
+    state Termsheet_Approval_Process {
+        [*] --> UnderNHQ
+        UnderNHQ --> TermsheetRefinement: Iterative Refinement
+        TermsheetRefinement --> UnderNHQ
+        UnderNHQ --> UnderApex: High Value Approval
+        UnderApex --> UnderNHQ
+        UnderNHQ --> Under_Acquisition: Approve (RE_NHQ)
+    }
+
+    state Under_Acquisition {
+        [*] --> LDD
+        LDD --> Agreement: Legal Clearance
+        Agreement --> RFC_Process: Handover to Projects (Legacy)
+    }
+
+    state RFC_Process {
+        [*] --> FitoutStart
+        FitoutStart --> Operational: Mark Operational (Projects)
+    }
+
+    state Operational {
+        [*] --> StoreOperational
+        StoreOperational --> Rent_Declaration: Start Rent Declaration (Central_SSO)
+    }
+    
+    state Rent_Declaration {
+        [*] --> RD_by_StateRE
+        RD_by_StateRE --> RD_Approved_by_BT: Submit RD (State_RE)
+        RD_Approved_by_BT --> [*]: Finalize (Finance)
+    }
+
+    Watchlist --> [*]: Dropped / Hold
+```
 
 ---
 
-## Codebase Index
+## 6. Action Control, Inputs & Gap Analysis (Done vs. To-Be-Done)
 
-### Frontend (`client/src`)
-*   **Pages**
-    *   [Dashboard.jsx](file:///Users/aritrosinha/code/REAgent/client/src/pages/Dashboard.jsx): Main view, lead table, and workflow visualizer.
-    *   [LeadDetail.jsx](file:///Users/aritrosinha/code/REAgent/client/src/pages/LeadDetail.jsx): Detailed view with action board for checking off items and transitioning stages.
-    *   [Login.jsx](file:///Users/aritrosinha/code/REAgent/client/src/pages/Login.jsx): Authentication screen with Mock Mode toggle and demo credentials.
-*   **Config**
-    *   `config/workflowConfig.js`: The source of truth for the 10-stage workflow, role mapping, and checklists.
+The following matrix details the permissions, required inputs, and current implementation status for each workflow stage.
 
-### Backend (`server`)
-*   **Controllers**
-    *   [leadController.js](file:///Users/aritrosinha/code/REAgent/server/controllers/leadController.js): Core logic for creating, updating (transitions), and deleting leads. Implements security checks.
-    *   [authController.js](file:///Users/aritrosinha/code/REAgent/server/controllers/authController.js): Handles user login and JWT generation.
-*   **Models**
-    *   [Lead.js](file:///Users/aritrosinha/code/REAgent/server/models/Lead.js): Database schema for Leads (including new `stage` and `sub_status` fields).
-    *   [User.js](file:///Users/aritrosinha/code/REAgent/server/models/User.js): User schema with Role ENUMs.
+### Stage 1: Option Identified
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **State_RE** | Create Lead | `title`, `details` (basic text) | `location_coordinates`, `photos` (mandatory), `carpet_area` | Basic CRUD, Role Check | Field Validation, Google Maps Integration, File Uploads |
+
+### Stage 2: Under BT Validation
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **BT** | Approve | `remarks` | `sales_projection_v1`, `catchment_score` | Status Transition | AI-based Sales Prediction, Auto-assignment to specific BT User |
+| **BT** | Raise Query | `query_text`, `remarks` | `query_category` (e.g., Competition, Demographics) | Ping-pong logic (Status Change) | Threaded Comments UI for query resolution |
+| **State_RE** | Reply to Query | `response_text` | `supporting_docs` | Transition back to BT | Notification to BT upon reply |
+
+### Stage 3: Under Negotiation
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **State_RE** | Submit Rate | `negotiated_rent`, `capex_ask` | `rent_comparison_matrix`, `competitor_rents` | Transition logic | "Rate Audit" feature comparing vs market average |
+| **BT** | Validate Rate | `validation_status` | `max_approvable_limit` | Reversion logic | Logic to auto-reject if > budget limit |
+
+### Stage 4: Under BT Approvals
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **BT** | Finalize Feasibility | `final_sales_projection`, `margin_analysis` | `layout_plan` (file), `npv_calculation` | Transition to Termsheet | Layout Version Control, Approval Workflow Engine integration |
+
+### Stage 5: Termsheet Approval
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **RE_NHQ** | Validate Termsheet | `commercial_terms` | `standard_clause_deviation_flag` | Role-gating | Digital Signature integration (DocuSign) |
+| **Apex** | High Value Approval | `approval_status` | `board_resolution_ref` | Manual status update support | Conditional Logic (System auto-routes to Apex if Rent > X) |
+
+### Stage 6: Under Acquisition (Legal)
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Legal** | Clear Title | `ldd_report`, `title_status` | `lawyer_assigned`, `risk_level` | Basic Status Tracking | Document Management System (DMS) integration |
+| **Legal** | Register Lease | `registration_date`, `doc_number` | `scanned_deed` | status update | OCR extraction of key dates from uploaded deed |
+
+### Stage 7: RFC / Fitout (Projects)
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Projects** | Mark Operational | `store_handover_date` | `snag_list`, `final_measurement_certificate` | Status: Operational | Integration with Project Management Tool (Jira/Asana) |
+
+### Stage 8: Operational (Central SSO)
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Central_SSO**| Initiate Rent Decl. | `go_live_date` | `sap_store_code` | Transition to Rent Decl. | Auto-push to SAP/ERP system |
+
+### Stage 9: Rent Declaration (Finance)
+| Role | Action | Input Parameters | Attributes to Add (Future) | Done ✅ | Yet to be Done 🚧 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Finance** | Activate Payment | `sap_vendor_code`, `payment_start_date`| `bank_mandate_copy` | Final Workflow Step | Automated email to Landlord with payment schedule |
 
 ---
 
-## Task & To-Do List
+## 7. Future Roadmap: Missing Features & Access Controls
 
-### Consolidated Implementation Plan (Completed)
-- [x] **Consolidate Workflow Logic**: Ensure 10-stage workflow is consistent across Client and Server.
-- [x] **Fix Delete Flow**:
-    - [x] Create `handleDelete` API endpoint.
-    - [x] Add Mock Mode support in `axios.js`.
-    - [x] Replace `window.confirm` with MUI `Dialog`.
-- [x] **Security Hardening**:
-    - [x] Add server-side role validation in `submitStepData`.
-- [x] **Cleanup**: Remove unused imports and fix console errors in `Dashboard.jsx`.
+### 1. Granular Attribute Access Control
+*   **Current State**: Roles control *transitions* (e.g., Next Step).
+*   **To-Be Implemented**: Roles should control *field-level* visibility.
+    *   *Example*: Only **Finance** should see `bank_details`.
+    *   *Example*: Only **BT** and **Apex** should see confidential `margin_analysis`.
 
-### Pending / Future Improvements
-- [ ] **Email Notifications**: Integrate email service for status change alerts.
-- [ ] **Document Uploads**: Implement actual S3/storage integration for file uploads in checklists.
-- [ ] **History / Audit Log**: Enhance the Audit Log UI to show differentials in data changes.
-- [ ] **Analytics**: Add a stats page for "Time in Stage" analysis.
+### 2. Notifications & SLAs
+*   **Current State**: Passive dashboard viewing.
+*   **To-Be Implemented**:
+    *   **Email/Slack Alerts**: When a lead enters your queue for action.
+    *   **SLA Tracking**: "Red Flag" if a lead sits in `Under_Negotiation` for > 7 days.
+
+### 3. File Handling
+*   **Current State**: Input fields are text-only.
+*   **To-Be Implemented**:
+    *   S3/Blob storage for Photos, Layouts, Legal Docs.
+    *   Previewers for PDF/Images within `LeadDetail`.
+
+### 4. Dynamic "Ping-Pong" Logic
+*   **Current State**: Some hardcoded "Return to BT" logic exists in `LeadDetail.jsx`.
+*   **To-Be Implemented**: A generic "Reject to Previous Stage" function in the backend that auto-calculates the reverse path without hardcoding.
